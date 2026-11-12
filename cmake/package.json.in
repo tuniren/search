@@ -1,0 +1,6 @@
+{
+  "name": "@PROJECT_NAME@",
+  "version": "@PROJECT_VERSION@",
+  "architecture": "windows-x64",
+  "configuration": "@CMAKE_BUILD_TYPE@"
+}

@@ -1,0 +1,10 @@
+/build/
+/dist/
+/.tools/
+/CMakeUserPresets.json
+/.vs/
+*.user
+*.log
+aqtinstall.log
+__pycache__/
+*.py[cod]

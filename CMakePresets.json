@@ -1,0 +1,43 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "BUILD_TESTING": "ON" }
+    },
+    {
+      "name": "windows-release",
+      "inherits": "base",
+      "displayName": "Windows x64 / vcpkg / Release",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "inherits": "windows-release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "qt-sdk-release",
+      "inherits": "base",
+      "displayName": "Windows x64 / prebuilt MSVC Qt SDK / Release",
+      "cacheVariables": { "CMAKE_PREFIX_PATH": "$env{QT_ROOT}" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-release", "configurePreset": "windows-release" },
+    { "name": "windows-debug", "configurePreset": "windows-debug" },
+    { "name": "qt-sdk-release", "configurePreset": "qt-sdk-release" }
+  ],
+  "testPresets": [
+    { "name": "windows-release", "configurePreset": "windows-release", "output": { "outputOnFailure": true } },
+    { "name": "windows-debug", "configurePreset": "windows-debug", "output": { "outputOnFailure": true } },
+    { "name": "qt-sdk-release", "configurePreset": "qt-sdk-release", "output": { "outputOnFailure": true } }
+  ]
+}
