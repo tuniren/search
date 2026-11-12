@@ -1,6 +1,7 @@
 #include "windows_integration.h"
 
 #include "core/search.h"
+#include "system_entries.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -115,6 +116,8 @@ QString shortcutTarget(const QString& path)
 
 bool runnableTarget(const QString& target)
 {
+    if (systemEntry(target))
+        return true;
     if (target.startsWith(QStringLiteral("shell:AppsFolder\\"), Qt::CaseInsensitive))
         return true;
     const QString extension = QFileInfo(target).suffix().toCaseFolded();
@@ -154,6 +157,9 @@ Catalog discoverStartMenuApplications(const QStringList& directories,
 Catalog discoverApplications(const std::shared_ptr<std::atomic_bool>& canceled)
 {
     auto items = discoverStartMenuApplications(startMenuDirectories(), canceled);
+    if (canceled->load())
+        return {};
+    items += discoverSystemEntries();
     QSet<QString> identities;
     for (const auto& item : items)
         identities.insert(item.id);
@@ -179,7 +185,7 @@ Catalog discoverApplications(const std::shared_ptr<std::atomic_bool>& canceled)
                                        ? parsingName
                                        : QStringLiteral("shell:AppsFolder\\") + parsingName;
             const QString id = target.toCaseFolded();
-            if (!identities.contains(id)) {
+            if (!identities.contains(id) && !systemEntry(target)) {
                 identities.insert(id);
                 items.push_back({id, name, target});
             }
@@ -192,6 +198,8 @@ Catalog discoverApplications(const std::shared_ptr<std::atomic_bool>& canceled)
 // translations. A third-party shortcut named "Calculator" does not qualify.
 QStringList systemApplicationAliases(const QString& target)
 {
+    if (const auto* entry = systemEntry(target))
+        return QStringList{entry->name} + entry->aliases;
     struct SystemApplication {
         const char* identity;
         const char* chinese;
@@ -267,6 +275,8 @@ void prepareApplications(Catalog& items)
                                    if (!runnableTarget(target))
                                        return true;
                                    item.searchAliases = systemApplicationAliases(target);
+                                   const auto* entry = systemEntry(target);
+                                   item.kind = entry ? entry->kind : ItemKind::Application;
                                    prepareSearch(item);
                                    return false;
                                }),
@@ -283,7 +293,12 @@ QImage applicationIcon(const QString& target, int size)
     const ComApartment apartment;
     if (!apartment.valid())
         return {};
-    const QString path = QDir::toNativeSeparators(target);
+    const auto* entry = systemEntry(target);
+    const QString iconTarget =
+        entry && entry->kind == ItemKind::Settings
+            ? qEnvironmentVariable("SystemRoot") + QStringLiteral("/ImmersiveControlPanel/SystemSettings.exe")
+            : target;
+    const QString path = QDir::toNativeSeparators(iconTarget);
     Microsoft::WRL::ComPtr<IShellItemImageFactory> factory;
     if (SUCCEEDED(SHCreateItemFromParsingName(reinterpret_cast<LPCWSTR>(path.utf16()), nullptr,
                                               IID_PPV_ARGS(&factory)))) {
@@ -295,6 +310,9 @@ QImage applicationIcon(const QString& target, int size)
                 return image;
         }
     }
+    if (entry && entry->kind == ItemKind::ControlPanel)
+        return applicationIcon(qEnvironmentVariable("SystemRoot") + QStringLiteral("/System32/control.exe"),
+                               size);
     // Shell's icon handler respects the shortcut's custom icon and target.
     SHFILEINFOW info{};
     if (!SHGetFileInfoW(reinterpret_cast<LPCWSTR>(path.utf16()), 0, &info, sizeof(info),
@@ -304,9 +322,15 @@ QImage applicationIcon(const QString& target, int size)
     return QImage::fromHICON(info.hIcon);
 }
 
+bool canRevealTarget(const CatalogItem& item)
+{
+    return !item.target.startsWith(QStringLiteral("shell:"), Qt::CaseInsensitive) &&
+           !item.target.startsWith(QStringLiteral("ms-settings:"), Qt::CaseInsensitive);
+}
+
 bool revealTarget(const CatalogItem& item)
 {
-    if (item.target.startsWith(QStringLiteral("shell:")))
+    if (!canRevealTarget(item))
         return false;
     const ComApartment apartment;
     if (!apartment.valid())

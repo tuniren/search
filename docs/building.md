@@ -11,7 +11,9 @@ search 支持 Windows 10/11 x64，使用 C++20 + Qt 6 Widgets，界面采用命�
 
 `Alt+Space` 呼出，输入名称搜索，`↑` / `↓` 选择，`Enter` 打开；`Shift+Enter` 打开所在位置，`Ctrl+,` 打开设置。右键结果可固定或设置别名。
 
-中文程序名支持原名、全拼和首字母，例如“微信 / weixin / wx”。常见 Windows 系统程序额外支持中英文别名，例如“计算器 / Calculator / jisuanqi / jsq”。第三方程序按开始菜单中的原名搜索，不自动翻译，可手动设置个人别名。文档、文件夹和未加入开始菜单的独立 EXE 不纳入搜索。
+中文程序名支持原名、全拼和首字母，例如“微信 / weixin / wx”。常见 Windows 系统程序额外支持中英文别名，例如“计算器 / Calculator / jisuanqi / jsq”。第三方程序按开始菜单中的原名搜索，不自动翻译，可手动设置个人别名。文档、文件夹和未加入开始菜单的第三方独立 EXE 不纳入搜索。
+
+内置系统入口无需加入开始菜单：可搜索“控制面板 / Control Panel / kzmb”“设置 / Settings / sz”“网络 / Network / wangluo / wl”，以及 Wi-Fi、以太网、网络连接、代理、VPN、蓝牙、显示、声音、电源、默认应用、开机启动、Windows 更新和常用管理工具等。结果区分设置、控制面板和系统工具，支持原生图标、固定、个人别名及使用热度；未使用的入口不会自动占满常用列表。设置页面可能受 Windows 版本、硬件和系统策略限制。
 
 设置、固定项与热度保存在 `%LOCALAPPDATA%/search`。已有 `%LOCALAPPDATA%/KeySeek` 目录会继续沿用。关闭窗口后仍在托盘运行，通过托盘菜单退出。命令行参数 `--settings` 打开设置，`--background` 在托盘启动。
 

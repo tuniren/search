@@ -73,7 +73,10 @@ Results search(const Catalog& catalog, QString query, const std::shared_ptr<std:
         score += static_cast<int>(std::min(30.0, std::log2(item.launches + 1.0) * 5));
         if (item.lastUsed > 0 && now - item.lastUsed < 86400 * 7)
             score += 15;
-        results.push_back({item, item.target, score});
+        const auto subtitle = item.kind == ItemKind::Application || item.kind == ItemKind::SystemTool
+                                  ? item.target
+                                  : QStringLiteral("Windows %1").arg(itemKindName(item.kind));
+        results.push_back({item, subtitle, score});
     }
     std::sort(results.begin(), results.end(), [frequent = needle.isEmpty()](const auto& a, const auto& b) {
         if (frequent) {

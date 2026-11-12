@@ -33,6 +33,7 @@ target_link_libraries(search_core PUBLIC Qt6::Core Qt6::Sql)
 
 add_library(search_desktop STATIC
     src/platform/windows_integration.h src/platform/windows_integration.cpp
+    src/platform/system_entries.h src/platform/system_entries.cpp
     src/platform/directory_monitor.h src/platform/directory_monitor.cpp
     src/app/catalog_service.h src/app/catalog_service.cpp
     src/ui/theme.h src/ui/theme.cpp

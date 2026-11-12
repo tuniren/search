@@ -52,8 +52,8 @@ SearchWindow::SearchWindow(QWidget* parent)
     searchIcon->setPixmap(glyphIcon(Glyph::Search).pixmap(25, 25));
     header->addWidget(searchIcon);
     input_->setObjectName(QStringLiteral("searchInput"));
-    input_->setPlaceholderText(QStringLiteral("搜索程序名称、全拼或首字母"));
-    input_->setAccessibleName(QStringLiteral("搜索开始菜单程序"));
+    input_->setPlaceholderText(QStringLiteral("搜索程序、设置或系统工具，支持拼音"));
+    input_->setAccessibleName(QStringLiteral("搜索程序和系统入口"));
     input_->setMaxLength(512);
     input_->setClearButtonEnabled(true);
     input_->installEventFilter(this);
@@ -90,7 +90,7 @@ SearchWindow::SearchWindow(QWidget* parent)
     empty_->setObjectName(QStringLiteral("muted"));
     empty_->setAlignment(Qt::AlignCenter);
     empty_->setFixedHeight(116);
-    empty_->setText(QStringLiteral("输入名称搜索程序\n打开后将自动加入常用列表"));
+    empty_->setText(QStringLiteral("搜索程序、设置或系统工具\n打开后将自动加入常用列表"));
     content->addWidget(empty_);
 
     auto* footer = new QHBoxLayout;
@@ -165,8 +165,8 @@ void SearchWindow::setResults(Results results)
     if (model_->rowCount())
         list_->setCurrentIndex(model_->index(std::max(0, row)));
     empty_->setText(input_->text().isEmpty()
-                        ? QStringLiteral("输入名称搜索程序\n打开后将自动加入常用列表")
-                        : QStringLiteral("没有匹配的程序\n请确认程序已加入 Windows 开始菜单"));
+                        ? QStringLiteral("搜索程序、设置或系统工具\n打开后将自动加入常用列表")
+                        : QStringLiteral("没有匹配的程序或系统入口\n可尝试中文、英文、全拼或首字母"));
     resizeToResults();
 }
 
@@ -219,6 +219,8 @@ void SearchWindow::activateSelection(bool reveal)
     if (const auto* result = model_->resultAt(list_->currentIndex().row())) {
         // Copy before emitting: the receiver may synchronously replace the model.
         const auto item = result->item;
+        if (reveal && !canRevealTarget(item))
+            return;
         emit actionRequested(item, reveal);
     }
 }
@@ -312,8 +314,9 @@ void SearchWindow::contextMenu(const QPoint& point)
     QMenu menu(this);
     auto* open = menu.addAction(QStringLiteral("打开"));
     auto* reveal = menu.addAction(QStringLiteral("打开所在位置"));
-    auto* copy = menu.addAction(QStringLiteral("复制程序路径"));
-    reveal->setEnabled(!item.target.startsWith(QStringLiteral("shell:")));
+    auto* copy = menu.addAction(canRevealTarget(item) ? QStringLiteral("复制程序路径")
+                                                      : QStringLiteral("复制入口地址"));
+    reveal->setEnabled(canRevealTarget(item));
     menu.addSeparator();
     auto* pin = menu.addAction(item.pinned ? QStringLiteral("取消固定") : QStringLiteral("固定到常用"));
     auto* alias = menu.addAction(QStringLiteral("设置搜索别名…"));

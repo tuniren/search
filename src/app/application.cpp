@@ -29,7 +29,7 @@ Application::Application(QString dataDirectory, QObject* parent)
     menu->addAction(QStringLiteral("搜索"), this, &Application::showSearch);
     menu->addAction(QStringLiteral("设置"), this, &Application::showSettings);
     menu->addSeparator();
-    menu->addAction(QStringLiteral("刷新程序列表"), &catalog_, &CatalogService::refresh);
+    menu->addAction(QStringLiteral("刷新搜索列表"), &catalog_, &CatalogService::refresh);
     menu->addAction(QStringLiteral("检查更新"), this, [this] {
         showSettings();
         settingsWindow_.showUpdates();

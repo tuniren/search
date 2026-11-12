@@ -81,7 +81,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     navigation->setObjectName(QStringLiteral("navigation"));
     navigation->setAccessibleName(QStringLiteral("设置分类"));
     navigation->addItems(
-        {QStringLiteral("常规"), QStringLiteral("外观"), QStringLiteral("程序搜索"), QStringLiteral("关于")});
+        {QStringLiteral("常规"), QStringLiteral("外观"), QStringLiteral("搜索范围"), QStringLiteral("关于")});
     sideLayout->addWidget(navigation, 1);
     sideLayout->addWidget(muted(QStringLiteral("版本 %1").arg(QString::fromLatin1(appVersion)), sidebar));
     sideLayout->addSpacing(16);
@@ -130,22 +130,23 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     pages->addWidget(appearance);
 
     auto* searchPage = new QWidget;
-    auto* searchLayout =
-        pageLayout(searchPage, QStringLiteral("程序搜索"), QStringLiteral("搜索 Windows 开始菜单中的程序。"));
+    auto* searchLayout = pageLayout(searchPage, QStringLiteral("搜索范围"),
+                                    QStringLiteral("搜索 Windows 程序、设置和系统工具。"));
     auto* sources = new QGroupBox(QStringLiteral("搜索范围"), searchPage);
     auto* sourcesLayout = new QVBoxLayout(sources);
-    sourcesLayout->addWidget(muted(
-        QStringLiteral("自动收录当前用户和所有用户的开始菜单程序，以及 Windows 注册的商店应用。"), sources));
-    sourcesLayout->addWidget(muted(
-        QStringLiteral(
-            "支持程序原名、中文全拼和拼音首字母。Windows 系统程序同时支持中英文名称；第三方程序保留原名。"),
-        sources));
+    sourcesLayout->addWidget(
+        muted(QStringLiteral("自动收录开始菜单程序、Windows 商店应用，以及设置、控制面板和常用系统工具。"),
+              sources));
+    sourcesLayout->addWidget(
+        muted(QStringLiteral(
+                  "支持原名、中文全拼和拼音首字母。系统入口支持中英文名称及常用关键词；第三方程序保留原名。"),
+              sources));
     searchLayout->addWidget(sources);
     status_->setObjectName(QStringLiteral("muted"));
     status_->setWordWrap(true);
     searchLayout->addWidget(status_);
     auto* maintenance = new QHBoxLayout;
-    auto* refresh = new QPushButton(QStringLiteral("刷新程序列表"), searchPage);
+    auto* refresh = new QPushButton(QStringLiteral("刷新搜索列表"), searchPage);
     auto* clearHistory = new QPushButton(QStringLiteral("清除使用历史"), searchPage);
     maintenance->addWidget(refresh);
     maintenance->addWidget(clearHistory);

@@ -62,7 +62,8 @@ void ResultDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option
     painter->setPen(option.palette.color(QPalette::PlaceholderText));
     painter->drawText(QRect(textLeft, row.top() + 35, textWidth, 20), Qt::AlignVCenter,
                       QFontMetrics(subtitleFont).elidedText(result->subtitle, Qt::ElideMiddle, textWidth));
-    painter->drawText(row.adjusted(0, 0, -14, 0), Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("程序"));
+    painter->drawText(row.adjusted(0, 0, -14, 0), Qt::AlignRight | Qt::AlignVCenter,
+                      itemKindName(result->item.kind));
     painter->restore();
 }
 

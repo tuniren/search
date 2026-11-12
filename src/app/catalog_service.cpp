@@ -4,6 +4,7 @@
 
 #include <QDateTime>
 #include <QtConcurrentRun>
+#include <algorithm>
 
 namespace searchapp
 {
@@ -83,7 +84,7 @@ void CatalogService::startScan()
     scanRunning_ = true;
     rerun_ = false;
     canceled_ = std::make_shared<std::atomic_bool>(false);
-    emit statusChanged(QStringLiteral("正在更新开始菜单程序…"));
+    emit statusChanged(QStringLiteral("正在更新程序和系统入口…"));
     watcher_.setFuture(
         QtConcurrent::run(&pool_, [store = store_, canceled = canceled_] { return scan(store, canceled); }));
 }
@@ -107,7 +108,11 @@ void CatalogService::finishScan()
         }
         catalog_ = std::make_shared<Catalog>(std::move(result.items));
         emit updated();
-        emit statusChanged(QStringLiteral("已收录 %1 个开始菜单程序").arg(catalog_->size()));
+        const auto systemCount = std::count_if(catalog_->cbegin(), catalog_->cend(), [](const auto& item) {
+            return item.kind != ItemKind::Application;
+        });
+        emit statusChanged(
+            QStringLiteral("已收录 %1 项，含 %2 个系统入口").arg(catalog_->size()).arg(systemCount));
     } else if (!result.error.isEmpty()) {
         emit statusChanged(QStringLiteral("程序列表更新失败：%1").arg(result.error));
     }

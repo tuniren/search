@@ -1,6 +1,7 @@
 #include "app/application.h"
 #include "core/search.h"
 #include "platform/directory_monitor.h"
+#include "platform/system_entries.h"
 #include "platform/windows_integration.h"
 #include "ui/result_model.h"
 #include "ui/search_window.h"
@@ -22,6 +23,7 @@
 #include <QScopeGuard>
 #include <QScreen>
 #include <QScrollBar>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <Windows.h>
@@ -145,6 +147,105 @@ private slots:
         QCOMPARE(actions, 1);
         QTest::keyClick(input, Qt::Key_Escape);
         QVERIFY(!window.isVisible());
+    }
+
+    void systemEntriesSearchAndPersistence()
+    {
+        auto items = discoverSystemEntries();
+        const auto count = items.size();
+        QVERIFY(count >= 40);
+        prepareApplications(items);
+        QCOMPARE(items.size(), count); // Virtual settings pages must survive runnable-target filtering.
+        QVERIFY(search(items, {}).isEmpty()); // New entries never fill the frequent-app list.
+        QSet<QString> identities;
+        QSet<QString> targets;
+        for (const auto& item : items) {
+            QVERIFY(!identities.contains(item.id));
+            QVERIFY(!targets.contains(item.target.toCaseFolded()));
+            identities.insert(item.id);
+            targets.insert(item.target.toCaseFolded());
+            QVERIFY(item.kind != ItemKind::Application);
+        }
+        const auto expect = [&](const QString& query, const QString& target) {
+            const auto found = search(items, query);
+            return !found.isEmpty() && found.front().item.target == target;
+        };
+        for (const auto* query : {"设置", "Settings", "shezhi", "sz"})
+            QVERIFY2(expect(QString::fromUtf8(query), QStringLiteral("ms-settings:")), query);
+        for (const auto* query : {"网络", "Network"})
+            QVERIFY2(expect(QString::fromUtf8(query), QStringLiteral("ms-settings:network")), query);
+        for (const auto* query : {"wangluo", "wl"}) {
+            const auto found = search(items, QString::fromUtf8(query));
+            QVERIFY2(std::any_of(found.cbegin(), found.cend(),
+                                 [](const auto& result) {
+                                     return result.item.target == QStringLiteral("ms-settings:network");
+                                 }),
+                     query);
+        }
+        for (const auto* query : {"控制面板", "Control Panel", "kongzhimianban", "kzmb"}) {
+            const auto found = search(items, QString::fromUtf8(query));
+            QVERIFY2(!found.isEmpty(), query);
+            QCOMPARE(found.front().item.name, QStringLiteral("控制面板"));
+            QCOMPARE(found.front().item.kind, ItemKind::ControlPanel);
+        }
+        QVERIFY(expect(QStringLiteral("proxy"), QStringLiteral("ms-settings:network-proxy")));
+        QVERIFY(expect(QStringLiteral("无线网络"), QStringLiteral("ms-settings:network-wifi")));
+        QVERIFY(
+            expect(QStringLiteral("环境变量"), qEnvironmentVariable("SystemRoot").replace(u'\\', u'/') +
+                                                   QStringLiteral("/System32/SystemPropertiesAdvanced.exe")));
+        const auto network = search(items, QStringLiteral("网络")).front().item;
+        QVERIFY(!canRevealTarget(network));
+        QVERIFY(!revealTarget(network));
+        QTemporaryDir directory;
+        CatalogStore store(directory.filePath(QStringLiteral("system.sqlite")));
+        store.replace(items);
+        store.recordLaunch(network.id);
+        store.setPersonalization(network.id, true, QStringLiteral("联网入口"));
+        auto restored = store.load();
+        prepareApplications(restored);
+        QCOMPARE(restored.size(), items.size());
+        const auto frequent = search(restored, {});
+        QCOMPARE(frequent.size(), 1);
+        QCOMPARE(frequent.front().item.id, network.id);
+        QCOMPARE(frequent.front().item.kind, ItemKind::Settings);
+        QCOMPARE(frequent.front().item.launches, 1);
+        QVERIFY(frequent.front().item.pinned);
+        QCOMPARE(search(restored, QStringLiteral("联网入口")).front().item.id, network.id);
+        QVERIFY(frequent.front().subtitle.contains(QStringLiteral("设置")));
+    }
+
+    void systemEntryNativeIconsAndKeyboard()
+    {
+        const HRESULT initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        const auto cleanup = qScopeGuard([&] {
+            if (SUCCEEDED(initialized))
+                CoUninitialize();
+        });
+        auto items = discoverSystemEntries();
+        prepareApplications(items);
+        for (const auto& item : items) {
+            if (item.kind != ItemKind::ControlPanel)
+                continue;
+            Microsoft::WRL::ComPtr<IShellItem> shellItem;
+            QVERIFY2(SUCCEEDED(SHCreateItemFromParsingName(reinterpret_cast<LPCWSTR>(item.target.utf16()),
+                                                           nullptr, IID_PPV_ARGS(&shellItem))),
+                     qPrintable(item.name));
+        }
+        for (const auto* query : {"设置", "控制面板", "网络连接"}) {
+            const auto found = search(items, QString::fromUtf8(query));
+            QVERIFY(!found.isEmpty());
+            QVERIFY2(!applicationIcon(found.front().item.target, 64).isNull(), query);
+        }
+        SearchWindow window;
+        window.setHideOnFocusLoss(false);
+        window.summon();
+        auto* input = window.findChild<QLineEdit*>(QStringLiteral("searchInput"));
+        window.setResults(search(items, QStringLiteral("网络")));
+        QSignalSpy actions(&window, &SearchWindow::actionRequested);
+        QTest::keyClick(input, Qt::Key_Return, Qt::ShiftModifier);
+        QCOMPARE(actions.size(), 0);
+        QTest::keyClick(input, Qt::Key_Return);
+        QCOMPARE(actions.size(), 1);
     }
 
     void searchSurfaceRepaintsAfterScrollingAndFiltering()

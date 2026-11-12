@@ -22,6 +22,7 @@ QStringList systemApplicationAliases(const QString& target);
 void prepareApplications(Catalog& items);
 QImage applicationIcon(const QString& target, int size);
 bool openTarget(const CatalogItem& item);
+bool canRevealTarget(const CatalogItem& item);
 bool revealTarget(const CatalogItem& item);
 bool setLaunchAtLogin(bool enabled, QString* error);
 QRect activationWorkArea();
