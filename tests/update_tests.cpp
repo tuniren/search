@@ -18,7 +18,7 @@ using namespace searchapp;
 
 namespace
 {
-const QString root = QStringLiteral("search-99.0.0-windows-x64-no-runtime");
+const QString root = QStringLiteral("search-99.0.0-windows-x64-with-runtime");
 const QByteArray payload("test update archive");
 
 QByteArray releaseJson()
@@ -39,7 +39,7 @@ QByteArray manifestJson(
     const QByteArray& checksum = QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex())
 {
     const QJsonObject package{{"architecture", "windows-x64"},
-                              {"variant", "no-runtime"},
+                              {"variant", "with-runtime"},
                               {"name", root + QStringLiteral(".zip")},
                               {"size", payload.size()},
                               {"sha256", QString::fromLatin1(checksum)}};
@@ -123,11 +123,11 @@ protected:
     }
 };
 
-void markInstallation(const QString& directory)
+void markInstallation(const QString& directory, const QString& variant = QStringLiteral("with-runtime"))
 {
     QFile file(directory + QStringLiteral("/package-info.json"));
     if (file.open(QIODevice::WriteOnly))
-        file.write("{\"variant\":\"no-runtime\"}");
+        file.write(QJsonDocument(QJsonObject{{"variant", variant}}).toJson());
 }
 } // namespace
 
@@ -150,29 +150,37 @@ private slots:
     void manifestValidation()
     {
         const auto release = parseRelease(releaseJson());
-        const auto package = selectPackage(manifestJson(), release, QStringLiteral("no-runtime"));
+        const auto package = selectPackage(manifestJson(), release, QStringLiteral("with-runtime"));
         QCOMPARE(package.size, payload.size());
         QCOMPARE(package.root, root);
         QVERIFY_THROWS_EXCEPTION(std::runtime_error,
-                                 selectPackage(manifestJson(), release, QStringLiteral("with-runtime")));
-        QVERIFY_THROWS_EXCEPTION(std::runtime_error,
-                                 selectPackage(manifestJson("wrong"), release, QStringLiteral("no-runtime")));
+                                 selectPackage(manifestJson(), release, QStringLiteral("no-runtime")));
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, selectPackage(manifestJson("wrong"), release,
+                                                                   QStringLiteral("with-runtime")));
         auto json = QJsonDocument::fromJson(manifestJson()).object();
         auto packages = json["packages"].toArray();
         packages.append(packages.first());
         json["packages"] = packages;
         QVERIFY_THROWS_EXCEPTION(std::runtime_error, selectPackage(QJsonDocument(json).toJson(), release,
-                                                                   QStringLiteral("no-runtime")));
+                                                                   QStringLiteral("with-runtime")));
         auto wrongSize = release;
         wrongSize.assets[root + QStringLiteral(".zip")].size++;
         QVERIFY_THROWS_EXCEPTION(std::runtime_error,
-                                 selectPackage(manifestJson(), wrongSize, QStringLiteral("no-runtime")));
+                                 selectPackage(manifestJson(), wrongSize, QStringLiteral("with-runtime")));
+    }
+
+    void downloadVerifiedAndDailyCheckCached_data()
+    {
+        QTest::addColumn<QString>("installedVariant");
+        QTest::newRow("with-runtime") << QStringLiteral("with-runtime");
+        QTest::newRow("legacy-no-runtime") << QStringLiteral("no-runtime");
     }
 
     void downloadVerifiedAndDailyCheckCached()
     {
+        QFETCH(QString, installedVariant);
         QTemporaryDir directory;
-        markInstallation(directory.path());
+        markInstallation(directory.path(), installedVariant);
         Network network;
         network.responses = {{releaseJson()}, {manifestJson()}, {payload}};
         UpdateService service(directory.path(), nullptr, &network, directory.path());

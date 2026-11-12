@@ -1,4 +1,4 @@
-"""Create both Windows portable editions from CMake installation components.
+"""Create the Windows portable package with the VC++ runtime included.
 
 Usage: python scripts/package.py --build-dir build/qt-sdk-release
 Requires Python 3.10+ and CMake; the application must already be built.
@@ -85,8 +85,7 @@ def package(build: Path, output: Path) -> None:
         raise FileNotFoundError(f'Build {metadata["name"]} before packaging')
     name = f'{metadata["name"]}-{metadata["version"]}-{metadata["architecture"]}'
     output.mkdir(parents=True, exist_ok=True)
-    sizes = []
-    packages = []
+    variant = "with-runtime"
     with tempfile.TemporaryDirectory(prefix="search-package-", dir=output) as temporary:
         temporary = Path(temporary).resolve()
         # The temporary directory's automatic recursive cleanup must stay
@@ -96,31 +95,27 @@ def package(build: Path, output: Path) -> None:
         stage = temporary / "application"
         install(build, stage, "Application")
         application_files = {path.relative_to(stage) for path in stage.rglob("*") if path.is_file()}
-        for variant in ("no-runtime", "with-runtime"):
-            if variant == "with-runtime":
-                install(build, stage, "Runtime")
-                if not any(path.name.lower() == "vcruntime140.dll" for path in stage.iterdir()):
-                    raise RuntimeError("The Runtime component did not supply the MSVC runtime DLLs")
-                if not application_files.issubset(
-                    path.relative_to(stage) for path in stage.rglob("*") if path.is_file()
-                ):
-                    raise RuntimeError("Runtime installation changed the application file set")
-            destination = output / f"{name}-{variant}.zip"
-            validate_layout(stage, metadata, variant)
-            compressed, unpacked = archive(stage, destination, temporary)
-            sizes.append((destination, compressed, unpacked))
-            packages.append({
-                "architecture": metadata["architecture"], "variant": variant,
-                "name": destination.name, "size": compressed,
-                "sha256": checksum(destination),
-            })
+        install(build, stage, "Runtime")
+        if not application_files.issubset(
+            path.relative_to(stage) for path in stage.rglob("*") if path.is_file()
+        ):
+            raise RuntimeError("Runtime installation changed the application file set")
+        destination = output / f"{name}-{variant}.zip"
+        validate_layout(stage, metadata, variant)
+        compressed, unpacked = archive(stage, destination, temporary)
+        packages = [{
+            "architecture": metadata["architecture"], "variant": variant,
+            "name": destination.name, "size": compressed,
+            "sha256": checksum(destination),
+        }]
         manifest = temporary / "update.json"
         manifest.write_text(json.dumps({"schema": 1, "version": metadata["version"], "packages": packages},
                                        indent=2) + "\n", encoding="utf-8")
         os.replace(manifest, output / "update.json")
-    print("\nPortable packages (decimal MB):")
-    for destination, compressed, unpacked in sizes:
-        print(f"  {destination}\n    ZIP {compressed / 1e6:.2f} MB; unpacked {unpacked / 1e6:.2f} MB")
+    # Remove only this version's discontinued edition after the replacement is ready.
+    (output / f"{name}-no-runtime.zip").unlink(missing_ok=True)
+    print("\nPortable package (decimal MB):")
+    print(f"  {destination}\n    ZIP {compressed / 1e6:.2f} MB; unpacked {unpacked / 1e6:.2f} MB")
 
 
 def main() -> None:

@@ -27,8 +27,10 @@ QString installationVariant(const QString& directory)
         return {};
     const auto value =
         QJsonDocument::fromJson(file.readAll()).object().value(QStringLiteral("variant")).toString();
-    return value == QStringLiteral("with-runtime") || value == QStringLiteral("no-runtime") ? value
-                                                                                            : QString{};
+    // Older no-runtime installations now receive the complete portable package too.
+    return value == QStringLiteral("with-runtime") || value == QStringLiteral("no-runtime")
+               ? QStringLiteral("with-runtime")
+               : QString{};
 }
 } // namespace
 

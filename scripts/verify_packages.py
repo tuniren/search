@@ -1,4 +1,4 @@
-"""Verify published portable ZIPs and start each edition with only Windows directories on PATH."""
+"""Verify the portable ZIP and start it with only Windows directories on PATH."""
 
 import argparse
 import hashlib
@@ -15,8 +15,8 @@ from package import validate_layout
 def verify(directory: Path) -> None:
     manifest = json.loads((directory / "update.json").read_text(encoding="utf-8"))
     packages = manifest["packages"]
-    if len(packages) != 2 or {item["variant"] for item in packages} != {"with-runtime", "no-runtime"}:
-        raise ValueError("Expected exactly one portable package of each runtime edition")
+    if len(packages) != 1 or packages[0]["variant"] != "with-runtime":
+        raise ValueError("Expected exactly one portable package with the VC++ runtime included")
     for item in packages:
         package = directory / item["name"]
         if package.parent.resolve() != directory.resolve():

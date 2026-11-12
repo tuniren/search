@@ -65,7 +65,7 @@ Release 构建保留调试符号用于崩溃定位，PDB 不进入发布包。�
 
 部署先安装到全新的暂存目录，成功后替换 `dist`，旧目录保留在构建目录中；不向旧目录累积文件。Python 打包脚本独立从安装规则生成发布包，避免打入开发工具或遗留文件。Python 3.10+ 用于打包和原生更新程序的集成测试，仅使用标准库。
 
-安装规则分成 Application 和 Runtime 两个组件，`scripts/package.py` 将它们组合成 `with-runtime` 包；`no-runtime` 包只包含 Application。Qt DLL 属于 Application，两种包都携带。`build.ps1 -Package` 调用同一 Python 脚本，一次生成两个 ZIP，包内附有使用条件及官方下载链接；`dist` 默认安装全部组件。脚本使用独立临时目录暂存文件，校验 ZIP 后原子替换输出文件。
+安装规则分成 Application 和 Runtime 两个组件，`scripts/package.py` 将它们组合成唯一的 `with-runtime` 包，包含 Qt DLL、插件和 VC++ 运行库。`build.ps1 -Package` 调用同一 Python 脚本，生成一个 ZIP 和更新清单；`dist` 默认安装全部组件。脚本使用独立临时目录暂存文件，校验 ZIP 后原子替换输出文件，并移除同版本的旧 `no-runtime` ZIP。
 
 桌面测试还覆盖自定义快捷方式图标、加载期间替换结果，以及列表滚动、输入法提交和过滤后的实际屏幕像素与完整重绘结果对比。
 

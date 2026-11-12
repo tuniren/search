@@ -6,8 +6,7 @@ search 支持 Windows 10/11 x64，使用 C++20 + Qt 6 Widgets，界面采用命�
 
 从 [Releases](https://github.com/tuniren/search/releases) 下载 ZIP，完整解压后运行 `search.exe`。
 
-- `with-runtime`：附带 VC++ 运行库，推荐解压即用。
-- `no-runtime`：需已安装 Microsoft Visual C++ v14 x64 运行库。
+仅提供 `with-runtime` 包，包含 Qt 和 VC++ 运行库，解压即用。
 
 `Alt+Space` 呼出，输入名称搜索，`↑` / `↓` 选择，`Enter` 打开；`Shift+Enter` 打开所在位置，`Ctrl+,` 打开设置。右键结果可固定或设置别名。
 
@@ -42,15 +41,15 @@ $env:VCPKG_ROOT = 'C:\tools\vcpkg'
 
 `-Deploy` 从干净目录生成 `dist/search.exe`，旧目录保存在构建目录中。程序运行时请先从托盘退出，再部署，以免文件占用。
 
-`-Package` 调用 Python 脚本生成两个 ZIP 和 `update.json`。也可对已有 Release 构建单独打包：
+`-Package` 调用 Python 脚本生成一个 `with-runtime` ZIP 和 `update.json`。也可对已有 Release 构建单独打包：
 
 ```powershell
 python scripts/package.py --build-dir build/qt-sdk-release
 ```
 
-默认输出在构建目录的 `packages` 下，支持 `--output-dir`。两个包都包含 Qt DLL 和插件，仅 VC++ 运行库不同。打包脚本使用 Python 标准库，校验 ZIP CRC 和包 SHA-256；用户电脑无需 Python。
+默认输出在构建目录的 `packages` 下，支持 `--output-dir`。包内包含 Qt DLL、插件和 VC++ 运行库；成功打包后移除输出目录中同版本的旧 `no-runtime` ZIP。打包脚本使用 Python 标准库，校验 ZIP CRC 和包 SHA-256；用户电脑无需 Python。
 
-`-Package` 会对两个 ZIP 校验文件布局，并在清除 Qt 环境变量、仅保留 Windows 系统目录的 PATH 下运行解压后的程序，防止依赖开发机上的 Qt。可单独复查：
+`-Package` 会校验 ZIP 文件布局和运行库，并在清除 Qt 环境变量、仅保留 Windows 系统目录的 PATH 下运行解压后的程序，防止依赖开发机上的 Qt。可单独复查：
 
 ```powershell
 python scripts/verify_packages.py --packages-dir build/qt-sdk-release/packages

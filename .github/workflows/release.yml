@@ -40,7 +40,7 @@ jobs:
         with:
           name: search-windows-x64
           path: |
-            build/qt-sdk-release/packages/*.zip
+            build/qt-sdk-release/packages/*-with-runtime.zip
             build/qt-sdk-release/packages/update.json
           if-no-files-found: error
   publish:
@@ -62,5 +62,21 @@ jobs:
           fail_on_unmatched_files: true
           overwrite_files: true
           files: |
-            packages/*.zip
+            packages/*-with-runtime.zip
             packages/update.json
+      - name: Remove discontinued no-runtime package
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              ...context.repo, tag,
+            });
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              ...context.repo, release_id: release.id,
+            });
+            const obsoleteName = `search-${tag.slice(1)}-windows-x64-no-runtime.zip`;
+            for (const asset of assets.filter(asset => asset.name === obsoleteName)) {
+              await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: asset.id });
+              core.info(`Removed ${asset.name}`);
+            }

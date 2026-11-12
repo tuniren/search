@@ -6,7 +6,7 @@ search 从公开仓库 `tuniren/search` 的 GitHub Releases 获取更新，不�
 
 设置 → 关于 → 检查更新 → 下载更新 → 重启更新。下载前可查看发布说明，下载过程中可取消；断网、GitHub 限流或校验失败时可重试，也可打开发布页手动下载。自动检查默认开启，每天最多一次，可在常规设置中关闭；不会自动下载或退出程序。
 
-更新沿用当前 `with-runtime` / `no-runtime` 类型，只接受正式版和 Windows x64 包。更新不会移动设置、固定项和使用热度。0.1.0 尚无更新模块，首次升级请完整解压 0.2.0 到新目录，之后可使用内置更新。
+更新统一使用 `with-runtime` 完整包，只接受正式版和 Windows x64 包。当前更新模块也会为旧 `no-runtime` 安装选择带运行库的包。此前下载的旧版本程序请先手动下载完整包到新目录；同版本重新发布不会触发内置更新提示。设置、固定项和使用热度会保留。
 
 HTTPS 使用系统 Schannel。程序限制更新地址为 GitHub 及其附件域名，下载时检查清单大小和 SHA-256，独立更新程序再次校验，并验证 ZIP 的 CRC、目录、文件类型及安装清单。SHA-256 用于完整性校验；当前未提供独立的发布签名或 Windows 代码签名。
 
@@ -37,6 +37,6 @@ HTTPS 使用系统 Schannel。程序限制更新地址为 GitHub 及其附件域
 .\scripts\build.ps1 -Deploy -Package
 ```
 
-Python 打包脚本输出两个完整 ZIP 和 `update.json`。ZIP 内含发行类型标记、安装文件清单和许可证，更新清单包含 schema、版本、架构、发行类型、文件名、字节数及 SHA-256。用户电脑不需要 Python。
+Python 打包脚本输出一个带运行库的完整 ZIP 和 `update.json`。ZIP 内含发行类型标记、安装文件清单和许可证，更新清单包含 schema、版本、架构、发行类型、文件名、字节数及 SHA-256。用户电脑不需要 Python。
 
-推送与版本号一致的 `vX.Y.Z` 标签后，`.github/workflows/release.yml` 在 Windows 上构建、运行测试并打包，再创建正式 Release，上传两个 ZIP 和 `update.json`。推送 main 或手动运行 workflow 仅构建并保存 Actions 附件。首次运行需仓库启用 GitHub Actions；发布 job 使用仓库自带的 `GITHUB_TOKEN`，无需在程序中保存任何凭据。
+推送与版本号一致的 `vX.Y.Z` 标签后，`.github/workflows/release.yml` 在 Windows 上构建、运行测试并打包，再创建正式 Release，上传 `with-runtime` ZIP 和 `update.json`，并移除该 Release 中同版本的旧 `no-runtime` ZIP。推送 main 或手动运行 workflow 仅构建并保存 Actions 附件。首次运行需仓库启用 GitHub Actions；发布 job 使用仓库自带的 `GITHUB_TOKEN`，无需在程序中保存任何凭据。
