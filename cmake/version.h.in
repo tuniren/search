@@ -1,0 +1,6 @@
+#pragma once
+
+namespace searchapp
+{
+inline constexpr char appVersion[] = "@PROJECT_VERSION@";
+}

@@ -5,6 +5,7 @@ Requires Python 3.10+ and CMake; the application must already be built.
 """
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -36,6 +37,14 @@ def archive(stage: Path, destination: Path, temporary: Path) -> tuple[int, int]:
     return destination.stat().st_size, unpacked_bytes
 
 
+def checksum(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def package(build: Path, output: Path) -> None:
     metadata = json.loads((build / "package.json").read_text(encoding="utf-8"))
     if metadata["configuration"] != "Release":
@@ -45,6 +54,7 @@ def package(build: Path, output: Path) -> None:
     name = f'{metadata["name"]}-{metadata["version"]}-{metadata["architecture"]}'
     output.mkdir(parents=True, exist_ok=True)
     sizes = []
+    packages = []
     with tempfile.TemporaryDirectory(prefix="search-package-", dir=output) as temporary:
         temporary = Path(temporary).resolve()
         # The temporary directory's automatic recursive cleanup must stay
@@ -66,6 +76,15 @@ def package(build: Path, output: Path) -> None:
             destination = output / f"{name}-{variant}.zip"
             compressed, unpacked = archive(stage, destination, temporary)
             sizes.append((destination, compressed, unpacked))
+            packages.append({
+                "architecture": metadata["architecture"], "variant": variant,
+                "name": destination.name, "size": compressed,
+                "sha256": checksum(destination),
+            })
+        manifest = temporary / "update.json"
+        manifest.write_text(json.dumps({"schema": 1, "version": metadata["version"], "packages": packages},
+                                       indent=2) + "\n", encoding="utf-8")
+        os.replace(manifest, output / "update.json")
     print("\nPortable packages (decimal MB):")
     for destination, compressed, unpacked in sizes:
         print(f"  {destination}\n    ZIP {compressed / 1e6:.2f} MB; unpacked {unpacked / 1e6:.2f} MB")

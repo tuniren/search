@@ -1,6 +1,7 @@
 #include "settings_window.h"
 
 #include "theme.h"
+#include "version.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -11,6 +12,8 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QPlainTextEdit>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QStackedWidget>
@@ -47,7 +50,12 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     : QWidget(parent, Qt::Window), shortcut_(new QKeySequenceEdit(this)),
       launchAtLogin_(new QCheckBox(QStringLiteral("登录 Windows 时启动 search"), this)),
       hideOnFocusLoss_(new QCheckBox(QStringLiteral("点击其他窗口时收起搜索面板"), this)),
-      theme_(new QComboBox(this)), status_(new QLabel(this)), error_(new QLabel(this))
+      checkForUpdates_(new QCheckBox(QStringLiteral("自动检查新版本（每天最多一次）"), this)),
+      theme_(new QComboBox(this)), status_(new QLabel(this)), error_(new QLabel(this)),
+      updateMessage_(new QLabel(this)), releaseNotes_(new QPlainTextEdit(this)),
+      updateProgress_(new QProgressBar(this)),
+      checkUpdate_(new QPushButton(QStringLiteral("检查更新"), this)), updateAction_(new QPushButton(this)),
+      cancelUpdate_(new QPushButton(QStringLiteral("取消下载"), this))
 {
     setObjectName(QStringLiteral("settingsRoot"));
     setWindowTitle(QStringLiteral("search 设置"));
@@ -75,7 +83,7 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     navigation->addItems(
         {QStringLiteral("常规"), QStringLiteral("外观"), QStringLiteral("程序搜索"), QStringLiteral("关于")});
     sideLayout->addWidget(navigation, 1);
-    sideLayout->addWidget(muted(QStringLiteral("版本 0.1.0"), sidebar));
+    sideLayout->addWidget(muted(QStringLiteral("版本 %1").arg(QString::fromLatin1(appVersion)), sidebar));
     sideLayout->addSpacing(16);
     body->addWidget(sidebar);
     auto* pages = new QStackedWidget(this);
@@ -98,6 +106,9 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     behaviorLayout->setSpacing(18);
     behaviorLayout->addWidget(launchAtLogin_);
     behaviorLayout->addWidget(hideOnFocusLoss_);
+    behaviorLayout->addWidget(checkForUpdates_);
+    behaviorLayout->addWidget(
+        muted(QStringLiteral("更新检查会连接 GitHub，仅检查版本；下载和重启由你决定。"), behavior));
     behaviorLayout->addWidget(
         muted(QStringLiteral("关闭搜索或设置窗口后仍在托盘运行，可从托盘菜单退出。"), behavior));
     generalLayout->addWidget(behavior);
@@ -153,7 +164,8 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     logo->setPixmap(glyphIcon(Glyph::Search).pixmap(72, 72));
     aboutLayout->addSpacing(24);
     aboutLayout->addWidget(logo);
-    aboutLayout->addWidget(new QLabel(QStringLiteral("search 0.1.0"), about));
+    aboutLayout->addWidget(
+        new QLabel(QStringLiteral("search %1").arg(QString::fromLatin1(appVersion)), about));
     auto* repository = new QLabel(
         QStringLiteral("<a href=\"https://github.com/tuniren/search\">https://github.com/tuniren/search</a>"),
         about);
@@ -161,6 +173,33 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     repository->setTextInteractionFlags(Qt::TextBrowserInteraction);
     repository->setAccessibleName(QStringLiteral("GitHub 仓库"));
     aboutLayout->addWidget(repository);
+    auto* updates = new QGroupBox(QStringLiteral("软件更新"), about);
+    auto* updateLayout = new QVBoxLayout(updates);
+    updateMessage_->setWordWrap(true);
+    updateMessage_->setTextFormat(Qt::PlainText);
+    updateMessage_->setObjectName(QStringLiteral("updateMessage"));
+    updateLayout->addWidget(updateMessage_);
+    releaseNotes_->setReadOnly(true);
+    releaseNotes_->setMaximumHeight(110);
+    releaseNotes_->setAccessibleName(QStringLiteral("新版本说明"));
+    updateLayout->addWidget(releaseNotes_);
+    updateProgress_->setAccessibleName(QStringLiteral("更新下载进度"));
+    updateLayout->addWidget(updateProgress_);
+    auto* updateButtons = new QHBoxLayout;
+    checkUpdate_->setObjectName(QStringLiteral("checkUpdate"));
+    updateAction_->setObjectName(QStringLiteral("updateAction"));
+    cancelUpdate_->setObjectName(QStringLiteral("cancelUpdate"));
+    updateButtons->addWidget(checkUpdate_);
+    updateButtons->addWidget(updateAction_);
+    updateButtons->addWidget(cancelUpdate_);
+    updateButtons->addStretch();
+    updateLayout->addLayout(updateButtons);
+    auto* releases = new QLabel(
+        QStringLiteral("<a href=\"https://github.com/tuniren/search/releases\">打开 GitHub 发布页</a>"),
+        updates);
+    releases->setOpenExternalLinks(true);
+    updateLayout->addWidget(releases);
+    aboutLayout->addWidget(updates);
     aboutLayout->addWidget(muted(
         QStringLiteral("C++20 · Qt 6 Widgets\n命令式 C++ 界面，Windows 系统集成。\n\n使用 ↑ ↓ 选择，Enter "
                        "打开，Shift+Enter 打开所在位置。\n右键结果可以固定常用项或设置搜索别名。"),
@@ -168,7 +207,12 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     aboutLayout->addWidget(
         muted(QStringLiteral("索引、设置及历史保存在本机用户目录，输入内容不会自动上传。"), about));
     aboutLayout->addStretch();
-    pages->addWidget(about);
+    auto* aboutScroll = new QScrollArea(pages);
+    aboutScroll->setWidgetResizable(true);
+    aboutScroll->setFrameShape(QFrame::NoFrame);
+    aboutScroll->setWidget(about);
+    pages->addWidget(aboutScroll);
+    setUpdateStatus({});
 
     auto* footer = new QHBoxLayout;
     footer->setContentsMargins(22, 14, 22, 16);
@@ -191,6 +235,18 @@ SettingsWindow::SettingsWindow(QWidget* parent)
     });
     connect(save, &QPushButton::clicked, this, &SettingsWindow::collectAndSave);
     connect(refresh, &QPushButton::clicked, this, &SettingsWindow::refreshRequested);
+    connect(checkUpdate_, &QPushButton::clicked, this, &SettingsWindow::checkUpdateRequested);
+    connect(cancelUpdate_, &QPushButton::clicked, this, &SettingsWindow::cancelUpdateRequested);
+    connect(updateAction_, &QPushButton::clicked, this, [this] {
+        if (updateState_ == UpdateState::Available)
+            emit downloadUpdateRequested();
+        else if (updateState_ == UpdateState::Ready &&
+                 QMessageBox::question(
+                     this, QStringLiteral("重启更新"),
+                     QStringLiteral("search 将退出、安装已下载的更新并重新启动。现在继续？")) ==
+                     QMessageBox::Yes)
+            emit installUpdateRequested();
+    });
     connect(clearHistory, &QPushButton::clicked, this, [this] {
         if (QMessageBox::question(this, QStringLiteral("清除使用历史"),
                                   QStringLiteral("清除打开次数及最近使用记录？固定项和别名会保留。")) ==
@@ -205,6 +261,7 @@ void SettingsWindow::setSettings(const Settings& value)
     shortcut_->setKeySequence(QKeySequence::fromString(value.hotkey, QKeySequence::PortableText));
     launchAtLogin_->setChecked(value.launchAtLogin);
     hideOnFocusLoss_->setChecked(value.hideOnFocusLoss);
+    checkForUpdates_->setChecked(value.checkForUpdates);
     theme_->setCurrentIndex(static_cast<int>(value.theme));
     error_->clear();
 }
@@ -225,12 +282,39 @@ void SettingsWindow::showSaved()
     error_->setText(QStringLiteral("设置已保存"));
 }
 
+void SettingsWindow::setUpdateStatus(const UpdateStatus& status)
+{
+    updateState_ = status.state;
+    updateMessage_->setText(status.message);
+    releaseNotes_->setPlainText(status.notes);
+    releaseNotes_->setVisible(!status.notes.isEmpty());
+    const bool downloading = status.state == UpdateState::Downloading;
+    const bool checking = status.state == UpdateState::Checking;
+    checkUpdate_->setEnabled(!checking && !downloading && status.state != UpdateState::Ready);
+    updateAction_->setVisible(status.state == UpdateState::Available || status.state == UpdateState::Ready);
+    updateAction_->setText(status.state == UpdateState::Ready ? QStringLiteral("重启更新")
+                                                              : QStringLiteral("下载更新"));
+    cancelUpdate_->setVisible(downloading);
+    updateProgress_->setVisible(downloading || checking);
+    updateProgress_->setRange(0, checking ? 0 : 1000);
+    updateProgress_->setValue(status.total > 0 ? static_cast<int>(status.received * 1000 / status.total) : 0);
+    updateProgress_->setFormat(QStringLiteral("%1 / %2 MB")
+                                   .arg(status.received / 1e6, 0, 'f', 2)
+                                   .arg(status.total / 1e6, 0, 'f', 2));
+}
+
+void SettingsWindow::showUpdates()
+{
+    findChild<QListWidget*>(QStringLiteral("navigation"))->setCurrentRow(3);
+}
+
 void SettingsWindow::collectAndSave()
 {
     Settings value = original_;
     value.hotkey = shortcut_->keySequence().toString(QKeySequence::PortableText);
     value.launchAtLogin = launchAtLogin_->isChecked();
     value.hideOnFocusLoss = hideOnFocusLoss_->isChecked();
+    value.checkForUpdates = checkForUpdates_->isChecked();
     value.theme = static_cast<Theme>(theme_->currentIndex());
     emit saveRequested(value);
 }

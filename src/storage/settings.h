@@ -12,6 +12,7 @@ struct Settings {
     Theme theme = Theme::System;
     bool hideOnFocusLoss = true;
     bool launchAtLogin = false;
+    bool checkForUpdates = true;
 };
 
 class SettingsStore

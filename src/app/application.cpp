@@ -15,6 +15,7 @@ namespace searchapp
 
 Application::Application(QString dataDirectory, QObject* parent)
     : QObject(parent), settingsStore_(std::move(dataDirectory)), settings_(settingsStore_.load()),
+      updates_(settingsStore_.directory(), this),
       catalog_(settingsStore_.directory() + QStringLiteral("/catalog.sqlite")), hotkey_(this), tray_(this)
 {
     applyTheme(*qApp, settings_.theme);
@@ -29,6 +30,11 @@ Application::Application(QString dataDirectory, QObject* parent)
     menu->addAction(QStringLiteral("设置"), this, &Application::showSettings);
     menu->addSeparator();
     menu->addAction(QStringLiteral("刷新程序列表"), &catalog_, &CatalogService::refresh);
+    menu->addAction(QStringLiteral("检查更新"), this, [this] {
+        showSettings();
+        settingsWindow_.showUpdates();
+        updates_.check();
+    });
     menu->addSeparator();
     menu->addAction(QStringLiteral("退出 search"), qApp, &QApplication::quit);
     tray_.setContextMenu(menu);
@@ -55,6 +61,25 @@ Application::Application(QString dataDirectory, QObject* parent)
             });
     connect(&settingsWindow_, &SettingsWindow::saveRequested, this, &Application::saveSettings);
     connect(&settingsWindow_, &SettingsWindow::refreshRequested, &catalog_, &CatalogService::refresh);
+    connect(&settingsWindow_, &SettingsWindow::checkUpdateRequested, &updates_, [this] { updates_.check(); });
+    connect(&settingsWindow_, &SettingsWindow::downloadUpdateRequested, &updates_, &UpdateService::download);
+    connect(&settingsWindow_, &SettingsWindow::cancelUpdateRequested, &updates_, &UpdateService::cancel);
+    connect(&settingsWindow_, &SettingsWindow::installUpdateRequested, &updates_, &UpdateService::install);
+    connect(&updates_, &UpdateService::changed, &settingsWindow_, &SettingsWindow::setUpdateStatus);
+    connect(&updates_, &UpdateService::changed, this, [this](const UpdateStatus& status) {
+        if (status.state == UpdateState::Available && !settingsWindow_.isVisible())
+            tray_.showMessage(QStringLiteral("search 更新"),
+                              status.message + QStringLiteral(" 可在设置 → 关于中下载。"),
+                              QSystemTrayIcon::Information);
+    });
+    connect(&updates_, &UpdateService::restartRequested, qApp, &QCoreApplication::quit);
+    auto* updateTimer = new QTimer(this);
+    updateTimer->setInterval(24 * 60 * 60 * 1000);
+    connect(updateTimer, &QTimer::timeout, this, [this] {
+        if (settings_.checkForUpdates)
+            updates_.check(false);
+    });
+    updateTimer->start();
     connect(&settingsWindow_, &SettingsWindow::clearHistoryRequested, this, [this] {
         try {
             catalog_.clearHistory();
@@ -111,6 +136,10 @@ void Application::start(bool background)
     }
     search_.setHotkeyLabel(settings_.hotkey);
     QTimer::singleShot(0, &catalog_, &CatalogService::start);
+    QTimer::singleShot(10000, this, [this] {
+        if (settings_.checkForUpdates)
+            updates_.check(false);
+    });
     if (!background)
         showSearch();
 }

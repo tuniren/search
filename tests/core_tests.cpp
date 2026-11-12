@@ -101,6 +101,7 @@ private slots:
         Settings value;
         value.hotkey = QStringLiteral("Ctrl+Alt+K");
         value.theme = Theme::Dark;
+        value.checkForUpdates = false;
         QSettings legacy(directory.filePath(QStringLiteral("settings.ini")), QSettings::IniFormat);
         legacy.setValue(QStringLiteral("index/roots"),
                         QStringList{QStringLiteral("C:/Users/example/Documents")});
@@ -110,6 +111,7 @@ private slots:
         const auto loaded = store.load();
         QCOMPARE(loaded.hotkey, value.hotkey);
         QCOMPARE(loaded.theme, value.theme);
+        QCOMPARE(loaded.checkForUpdates, false);
         legacy.sync();
         QVERIFY(!legacy.contains(QStringLiteral("index/roots")));
         QVERIFY(!legacy.contains(QStringLiteral("search/web")));

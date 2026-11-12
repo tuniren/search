@@ -1,11 +1,14 @@
 #include "app/application.h"
 #include "ui/theme.h"
+#include "version.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QFileInfo>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMessageBox>
+#include <QSaveFile>
 #include <QTimer>
 #include <Windows.h>
 #include <memory>
@@ -15,7 +18,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("search"));
     QCoreApplication::setApplicationName(QStringLiteral("search"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QCoreApplication::setApplicationVersion(QString::fromLatin1(searchapp::appVersion));
     app.setWindowIcon(searchapp::glyphIcon(searchapp::Glyph::Search));
     app.setQuitOnLastWindowClosed(false);
 
@@ -25,6 +28,8 @@ int main(int argc, char* argv[])
     parser.addVersionOption();
     parser.addOption({QStringLiteral("background"), QStringLiteral("在托盘中启动")});
     parser.addOption({QStringLiteral("settings"), QStringLiteral("打开设置窗口")});
+    parser.addOption(
+        {QStringLiteral("update-ready"), QStringLiteral("更新程序内部启动确认"), QStringLiteral("path")});
     parser.process(app);
 
     try {
@@ -89,6 +94,20 @@ int main(int argc, char* argv[])
                           parser.isSet(QStringLiteral("settings")));
         if (parser.isSet(QStringLiteral("settings")))
             application.showSettings();
+        if (parser.isSet(QStringLiteral("update-ready"))) {
+            const auto path = parser.value(QStringLiteral("update-ready"));
+            const auto expected =
+                QCoreApplication::applicationDirPath() + QStringLiteral("/.search-update/started");
+            if (QFileInfo(path).absoluteFilePath() == QFileInfo(expected).absoluteFilePath()) {
+                QTimer::singleShot(1500, &app, [path] {
+                    QSaveFile ready(path);
+                    if (ready.open(QIODevice::WriteOnly)) {
+                        ready.write("search-update-ready\n");
+                        ready.commit();
+                    }
+                });
+            }
+        }
         return app.exec();
     } catch (const std::exception& error) {
         QMessageBox::critical(nullptr, QStringLiteral("search"), QString::fromUtf8(error.what()));

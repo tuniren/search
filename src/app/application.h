@@ -39,6 +39,7 @@ private:
 
     SettingsStore settingsStore_;
     Settings settings_;
+    UpdateService updates_;
     CatalogService catalog_;
     GlobalHotkey hotkey_;
     SearchWindow search_;

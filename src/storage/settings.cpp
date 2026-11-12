@@ -30,6 +30,7 @@ Settings SettingsStore::load() const
     value.theme = theme >= 0 && theme <= 2 ? static_cast<Theme>(theme) : Theme::System;
     value.hideOnFocusLoss = file.value(QStringLiteral("general/hideOnFocusLoss"), true).toBool();
     value.launchAtLogin = file.value(QStringLiteral("general/launchAtLogin"), false).toBool();
+    value.checkForUpdates = file.value(QStringLiteral("updates/automaticCheck"), true).toBool();
     return value;
 }
 
@@ -42,6 +43,7 @@ bool SettingsStore::save(const Settings& value, QString* error) const
     file.remove(QStringLiteral("search"));
     file.setValue(QStringLiteral("general/hideOnFocusLoss"), value.hideOnFocusLoss);
     file.setValue(QStringLiteral("general/launchAtLogin"), value.launchAtLogin);
+    file.setValue(QStringLiteral("updates/automaticCheck"), value.checkForUpdates);
     file.sync();
     if (file.status() == QSettings::NoError)
         return true;

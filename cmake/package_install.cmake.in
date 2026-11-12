@@ -1,0 +1,9 @@
+# Runs last for each component, including plain `cmake --install` deployments.
+set(variant "@SEARCH_PACKAGE_VARIANT@")
+file(WRITE "${CMAKE_INSTALL_PREFIX}/package-info.json"
+    "{\n  \"version\": \"@PROJECT_VERSION@\",\n  \"architecture\": \"windows-x64\",\n  \"variant\": \"${variant}\"\n}\n")
+file(WRITE "${CMAKE_INSTALL_PREFIX}/installed-files.txt" "")
+file(GLOB_RECURSE files LIST_DIRECTORIES false RELATIVE "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_PREFIX}/*")
+list(SORT files)
+list(JOIN files "\n" inventory)
+file(WRITE "${CMAKE_INSTALL_PREFIX}/installed-files.txt" "${inventory}\n")
