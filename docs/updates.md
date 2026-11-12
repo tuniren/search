@@ -31,7 +31,7 @@ HTTPS 使用系统 Schannel。程序限制更新地址为 GitHub 及其附件域
 
 ## 发布
 
-版本号以 `CMakeLists.txt` 的 `project(... VERSION ...)` 为准，程序、设置页面、Windows 资源和打包元数据使用同一来源；同步修改 `vcpkg.json` 的 `version-semver`。
+版本号以 `CMakeLists.txt` 的 `project(... VERSION ...)` 为准，程序、设置页面、Windows 资源和打包元数据使用同一来源；同步修改 `vcpkg.json` 的 `version-semver`，并提供 `docs/releases/vX.Y.Z.md` 发布说明。
 
 ```powershell
 .\scripts\build.ps1 -Deploy -Package

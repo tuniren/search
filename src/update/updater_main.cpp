@@ -126,8 +126,9 @@ Files inventory(const fs::path& path)
     size_t position = 0;
     while (position < data.size()) {
         const auto end = data.find('\n', position);
-        const auto line =
-            data.substr(position, end == std::string::npos ? data.size() - position : end - position);
+        auto line = data.substr(position, end == std::string::npos ? data.size() - position : end - position);
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
         const auto relative = relativePath(line).generic_wstring();
         if (!result.insert(folded(relative)).second || result.size() > 4096)
             throw std::runtime_error("Duplicate or excessive package files");
@@ -341,6 +342,17 @@ Process confirmStartup(const fs::path& target, const fs::path& ready)
     }
 }
 
+Handle lockInstallation(const fs::path& target)
+{
+    const auto path = target / L".search-update.lock";
+    noReparsePoints(path);
+    Handle lock(CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS,
+                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE, nullptr));
+    if (lock.get() == INVALID_HANDLE_VALUE)
+        throw std::runtime_error("Another update is running or the program directory is not writable");
+    return lock;
+}
+
 void apply(DWORD pid, const fs::path& target, const fs::path& archive, const std::wstring& checksum,
            const std::wstring& root)
 {
@@ -348,10 +360,7 @@ void apply(DWORD pid, const fs::path& target, const fs::path& archive, const std
     noReparsePoints(archive);
     if (!fs::is_directory(target) || !fs::is_regular_file(target / L"search.exe"))
         throw std::runtime_error("Invalid installation directory");
-    Handle lock(CreateFileW((target / L".search-update.lock").c_str(), GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS,
-                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE, nullptr));
-    if (lock.get() == INVALID_HANDLE_VALUE)
-        throw std::runtime_error("Another update is running or the program directory is not writable");
+    auto lock = lockInstallation(target);
     verifyHash(archive, checksum);
     waitForParent(pid, target / L"search.exe");
     rollback(target); // Recover an interrupted transaction before beginning another.
@@ -437,6 +446,13 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         if (args.size() == 3 && args[1] == L"--recover") {
             const auto target = fs::absolute(args[2]).lexically_normal();
             noReparsePoints(target);
+            auto lock = lockInstallation(target);
+            if (fs::exists(target / L"search.exe")) {
+                Handle probe(CreateFileW((target / L"search.exe").c_str(), GENERIC_WRITE, 0, nullptr,
+                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+                if (probe.get() == INVALID_HANDLE_VALUE)
+                    throw std::runtime_error("Exit search before running recovery");
+            }
             rollback(target);
             launch(target);
         } else if (args.size() == 7 && args[1] == L"--apply") {

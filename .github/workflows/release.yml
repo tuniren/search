@@ -32,6 +32,7 @@ jobs:
           import os, pathlib, re
           version = re.search(r'project\(search VERSION ([0-9.]+)', pathlib.Path('CMakeLists.txt').read_text())[1]
           assert os.environ['GITHUB_REF_NAME'] == f'v{version}', 'Tag must match CMake project version'
+          assert pathlib.Path(f'docs/releases/v{version}.md').is_file(), 'Release notes are required'
       - name: Build, test and package
         shell: pwsh
         run: ./scripts/build.ps1 -QtRoot $env:QT_ROOT_DIR -Package
@@ -49,13 +50,15 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: search-windows-x64
           path: packages
       - uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          name: search ${{ github.ref_name }}
+          body_path: docs/releases/${{ github.ref_name }}.md
           fail_on_unmatched_files: true
           files: |
             packages/*.zip

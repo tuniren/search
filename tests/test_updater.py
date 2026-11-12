@@ -48,7 +48,7 @@ class UpdaterTests(unittest.TestCase):
 
     @staticmethod
     def with_inventory(files):
-        files["installed-files.txt"] = ("\n".join(sorted(set(files) | {"installed-files.txt"})) + "\n").encode()
+        files["installed-files.txt"] = ("\r\n".join(sorted(set(files) | {"installed-files.txt"})) + "\r\n").encode()
 
     def tearDown(self):
         # A successful fixture remains alive briefly so startup confirmation sees it.
@@ -97,6 +97,12 @@ class UpdaterTests(unittest.TestCase):
         self.pack()
         self.assertNotEqual(self.run_update("0" * 64), 0)
         self.assert_old_intact()
+
+    def test_lf_inventory_is_also_supported(self):
+        path = self.target / "installed-files.txt"
+        path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
+        self.pack()
+        self.assertEqual(self.run_update(), 0)
 
     def test_corrupt_zip_crc_preserves_original(self):
         self.pack()
