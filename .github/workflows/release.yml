@@ -60,6 +60,7 @@ jobs:
           name: search ${{ github.ref_name }}
           body_path: docs/releases/${{ github.ref_name }}.md
           fail_on_unmatched_files: true
+          overwrite_files: true
           files: |
             packages/*.zip
             packages/update.json

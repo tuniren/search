@@ -82,6 +82,8 @@ try {
     if ($Package) {
         & python (Join-Path $PSScriptRoot 'package.py') --build-dir $buildDirectory
         if ($LASTEXITCODE -ne 0) { throw 'Packaging failed.' }
+        & python (Join-Path $PSScriptRoot 'verify_packages.py') --packages-dir (Join-Path $buildDirectory 'packages')
+        if ($LASTEXITCODE -ne 0) { throw 'Portable package verification failed.' }
     }
     Write-Host "Built: $buildDirectory\search.exe"
 } finally { Pop-Location }

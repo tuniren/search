@@ -5,6 +5,7 @@ Requires Python 3.10+ and CMake; the application must already be built.
 """
 
 import argparse
+import configparser
 import hashlib
 import json
 import os
@@ -12,6 +13,37 @@ from pathlib import Path
 import subprocess
 import tempfile
 from zipfile import ZIP_DEFLATED, ZipFile
+
+
+def validate_layout(stage: Path, metadata: dict, variant: str) -> None:
+    """Reject incomplete packages before publishing any archive or update manifest."""
+    required = {
+        "search.exe", "search-updater.exe", "Qt6Core.dll", "Qt6Gui.dll",
+        "Qt6Widgets.dll", "Qt6Network.dll", "Qt6Sql.dll", "qt.conf",
+        "plugins/platforms/qwindows.dll", "plugins/sqldrivers/qsqlite.dll",
+        "plugins/imageformats/qico.dll", "plugins/tls/qschannelbackend.dll",
+        "package-info.json", "installed-files.txt",
+    }
+    runtime = {"vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll", "msvcp140_1.dll",
+               "msvcp140_2.dll", "msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll", "concrt140.dll"}
+    files = {path.relative_to(stage).as_posix() for path in stage.rglob("*") if path.is_file()}
+    missing = (required | (runtime if variant == "with-runtime" else set())) - files
+    if missing:
+        raise ValueError(f"Invalid portable layout; missing files beside search.exe or plugins: {sorted(missing)}")
+    if variant == "no-runtime" and files & runtime:
+        raise ValueError("The no-runtime package unexpectedly contains VC++ runtime DLLs")
+    inventory = set((stage / "installed-files.txt").read_text(encoding="utf-8").splitlines())
+    if files != inventory:
+        raise ValueError("Installed file inventory does not match the package contents")
+    info = json.loads((stage / "package-info.json").read_text(encoding="utf-8"))
+    if any(info.get(key) != metadata[key] for key in ("version", "architecture")) or info.get("variant") != variant:
+        raise ValueError("Package identity does not match the requested edition")
+    configuration = configparser.ConfigParser()
+    configuration.read(stage / "qt.conf", encoding="utf-8")
+    prefix = stage / configuration.get("Paths", "Prefix", fallback=".")
+    plugins = prefix / configuration.get("Paths", "Plugins", fallback="plugins")
+    if prefix.resolve() != stage.resolve() or plugins.resolve() != (stage / "plugins").resolve():
+        raise ValueError("qt.conf points outside the portable package's plugin layout")
 
 
 def install(build: Path, destination: Path, component: str) -> None:
@@ -74,6 +106,7 @@ def package(build: Path, output: Path) -> None:
                 ):
                     raise RuntimeError("Runtime installation changed the application file set")
             destination = output / f"{name}-{variant}.zip"
+            validate_layout(stage, metadata, variant)
             compressed, unpacked = archive(stage, destination, temporary)
             sizes.append((destination, compressed, unpacked))
             packages.append({

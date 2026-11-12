@@ -48,4 +48,10 @@ python scripts/package.py --build-dir build/qt-sdk-release
 
 默认输出在构建目录的 `packages` 下，支持 `--output-dir`。两个包都包含 Qt DLL 和插件，仅 VC++ 运行库不同。打包脚本使用 Python 标准库，校验 ZIP CRC 和包 SHA-256；用户电脑无需 Python。
 
+`-Package` 会对两个 ZIP 校验文件布局，并在清除 Qt 环境变量、仅保留 Windows 系统目录的 PATH 下运行解压后的程序，防止依赖开发机上的 Qt。可单独复查：
+
+```powershell
+python scripts/verify_packages.py --packages-dir build/qt-sdk-release/packages
+```
+
 更多细节见 [更新与发布](updates.md) 和 [第三方组件](third-party.md)。

@@ -13,6 +13,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
+# Qt captures GNUInstallDirs when it is first loaded. Set the portable layout
+# before find_package so a fresh build deploys DLLs beside search.exe too.
+set(CMAKE_INSTALL_BINDIR "." CACHE PATH "Executable install directory" FORCE)
+include(GNUInstallDirs)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Concurrent Network Sql)
 include(CTest)
 configure_file(cmake/version.h.in "${CMAKE_BINARY_DIR}/generated/version.h" @ONLY)
@@ -107,20 +111,23 @@ if(BUILD_TESTING)
     set_tests_properties(search.updater PROPERTIES TIMEOUT 90)
 endif()
 
-set(CMAKE_INSTALL_BINDIR "." CACHE PATH "Executable install directory" FORCE)
-include(GNUInstallDirs)
 install(TARGETS search search_updater RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Application)
 # Generate the call directly: Qt 6.8's app-script helper serializes forwarded
 # tool arguments as a semicolon-prefixed token, so exclusions can be ignored.
 qt_generate_deploy_script(TARGET search OUTPUT_SCRIPT deploy_script CONTENT [[
+# Explicit deployment paths also cover an existing build cache with Qt's old defaults.
+set(QT_DEPLOY_BIN_DIR ".")
 qt_deploy_runtime_dependencies(
     EXECUTABLE "$<TARGET_FILE:search>"
+    BIN_DIR "."
+    LIB_DIR "."
+    PLUGINS_DIR "plugins"
     GENERATE_QT_CONF
     NO_TRANSLATIONS
     NO_COMPILER_RUNTIME
     DEPLOY_TOOL_OPTIONS
         --skip-plugin-types generic,networkinformation,styles
-        --exclude-plugins qgif,qjpeg,qsqlmimer,qsqlodbc,qsqlpsql,qopensslbackend,qcertonlybackend
+        --exclude-plugins qgif,qjpeg,qsvg,qsvgicon,qsqlmimer,qsqlodbc,qsqlpsql,qopensslbackend,qcertonlybackend
         --no-system-d3d-compiler --no-system-dxc-compiler --no-opengl-sw
 )
 ]])
